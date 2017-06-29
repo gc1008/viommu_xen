@@ -48,7 +48,8 @@
 #define DMAR_IQT_REG            0x88 /* invalidation queue tail */
 #define DMAR_IQA_REG            0x90 /* invalidation queue addr */
 #define DMAR_IECTL_REG          0xa0 /* invalidation event control register */
-#define DMAR_IRTA_REG           0xb8 /* intr remap */
+#define DMAR_IRTA_REG           0xb8 /* base address of intr remap table */
+#define DMAR_IRTUA_REG          0xbc /* upper address of intr remap table */
 
 #define OFFSET_STRIDE        (9)
 #define dmar_readl(dmar, reg) readl((dmar) + (reg))
@@ -150,6 +151,9 @@
 #define DMA_GCMD_SIRTP  (((u64)1) << 24)
 #define DMA_GCMD_CFI    (((u64)1) << 23)
 
+/* mask of one-shot bits */
+#define DMA_GCMD_ONE_SHOT_MASK 0x96ffffff
+
 /* GSTS_REG */
 #define DMA_GSTS_TES    (((u64)1) << 31)
 #define DMA_GSTS_RTPS   (((u64)1) << 30)
@@ -157,9 +161,17 @@
 #define DMA_GSTS_AFLS   (((u64)1) << 28)
 #define DMA_GSTS_WBFS   (((u64)1) << 27)
 #define DMA_GSTS_QIES   (((u64)1) <<26)
+#define DMA_GSTS_SIRTPS_SHIFT   24
+#define DMA_GSTS_SIRTPS (((u64)1) << DMA_GSTS_SIRTPS_SHIFT)
 #define DMA_GSTS_IRES   (((u64)1) <<25)
-#define DMA_GSTS_SIRTPS (((u64)1) << 24)
 #define DMA_GSTS_CFIS   (((u64)1) <<23)
+
+/* IRTA_REG */
+/* The base of 4KB aligned interrupt remapping table */
+#define DMA_IRTA_ADDR(val)      ((val) & ~0xfffULL)
+/* The size of remapping table is 2^(x+1), where x is the size field in IRTA */
+#define DMA_IRTA_S(val)         (val & 0xf)
+#define DMA_IRTA_SIZE(val)      (1UL << (DMA_IRTA_S(val) + 1))
 
 /* PMEN_REG */
 #define DMA_PMEN_EPM    (((u32)1) << 31)

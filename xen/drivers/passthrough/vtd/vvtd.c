@@ -36,6 +36,12 @@
 #define VVTD_MAX_OFFSET VVTD_FRCD_END
 
 struct hvm_hw_vvtd {
+    bool eim_enabled;
+
+    /* Interrupt remapping table base gfn and the max of entries */
+    uint16_t irt_max_entry;
+    gfn_t irt;
+
     uint32_t regs[VVTD_MAX_OFFSET/sizeof(uint32_t)];
 };
 
@@ -73,6 +79,16 @@ boolean_runtime_param("viommu_verbose", viommu_verbose);
 
 #define VVTD_REG_POS(vvtd, offset) &(vvtd->hw.regs[offset/sizeof(uint32_t)])
 
+static inline void vvtd_set_bit(struct vvtd *vvtd, uint32_t reg, int nr)
+{
+    __set_bit(nr, VVTD_REG_POS(vvtd, reg));
+}
+
+static inline void vvtd_clear_bit(struct vvtd *vvtd, uint32_t reg, int nr)
+{
+    __clear_bit(nr, VVTD_REG_POS(vvtd, reg));
+}
+
 static inline void vvtd_set_reg(struct vvtd *vvtd, uint32_t reg, uint32_t value)
 {
     *VVTD_REG_POS(vvtd, reg) = value;
@@ -100,6 +116,52 @@ static void *domain_vvtd(const struct domain *d)
         return d->arch.hvm_domain.viommu->priv;
     else
         return NULL;
+}
+
+static void write_gcmd_sirtp(struct vvtd *vvtd, uint32_t val)
+{
+    uint64_t irta = vvtd_get_reg_quad(vvtd, DMAR_IRTA_REG);
+
+    if ( !(val & DMA_GCMD_SIRTP) )
+        return;
+
+    /*
+     * Hardware clears this bit when software sets the SIRTPS field in
+     * the Global Command register and sets it when hardware completes
+     * the 'Set Interrupt Remap Table Pointer' operation.
+     */
+    vvtd_clear_bit(vvtd, DMAR_GSTS_REG, DMA_GSTS_SIRTPS_SHIFT);
+
+    if ( gfn_x(vvtd->hw.irt) != PFN_DOWN(DMA_IRTA_ADDR(irta)) ||
+         vvtd->hw.irt_max_entry != DMA_IRTA_SIZE(irta) )
+    {
+        vvtd->hw.irt = _gfn(PFN_DOWN(DMA_IRTA_ADDR(irta)));
+        vvtd->hw.irt_max_entry = DMA_IRTA_SIZE(irta);
+        vvtd->hw.eim_enabled = !!(irta & IRTA_EIME);
+        vvtd_info("Update IR info (addr=%lx eim=%d size=%d)\n",
+                  gfn_x(vvtd->hw.irt), vvtd->hw.eim_enabled,
+                  vvtd->hw.irt_max_entry);
+    }
+    vvtd_set_bit(vvtd, DMAR_GSTS_REG, DMA_GSTS_SIRTPS_SHIFT);
+}
+
+static void vvtd_write_gcmd(struct vvtd *vvtd, uint32_t val)
+{
+    uint32_t orig = vvtd_get_reg(vvtd, DMAR_GSTS_REG);
+    uint32_t changed;
+
+    orig = orig & DMA_GCMD_ONE_SHOT_MASK;   /* reset the one-shot bits */
+    changed = orig ^ val;
+
+    if ( !changed )
+        return;
+
+    if ( changed & (changed - 1) )
+        vvtd_info("Write %x to GCMD (current %x), updating multiple fields",
+                  val, orig);
+
+    if ( changed & DMA_GCMD_SIRTP )
+        write_gcmd_sirtp(vvtd, val);
 }
 
 static int vvtd_in_range(struct vcpu *v, unsigned long addr)
@@ -138,6 +200,30 @@ static int vvtd_write(struct vcpu *v, unsigned long addr,
     unsigned int offset = addr - vvtd->base_addr;
 
     vvtd_info("Write offset %x len %d val %lx\n", offset, len, val);
+
+    if ( (len != 4 && len != 8) || (offset & (len - 1)) )
+        return X86EMUL_OKAY;
+
+    switch ( offset )
+    {
+    case DMAR_GCMD_REG:
+        vvtd_write_gcmd(vvtd, val);
+        break;
+
+    case DMAR_IRTA_REG:
+        vvtd_set_reg(vvtd, offset, val);
+        if ( len == 4 )
+            break;
+        val = val >> 32;
+        offset += 4;
+        /* Fall through */
+    case DMAR_IRTUA_REG:
+        vvtd_set_reg(vvtd, offset, val);
+        break;
+
+    default:
+        break;
+    }
 
     return X86EMUL_OKAY;
 }
