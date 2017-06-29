@@ -49,6 +49,15 @@ struct arch_irq_remapping_request
     enum viommu_irq_request_type type;
 };
 
+static inline void irq_request_ioapic_fill(
+    struct arch_irq_remapping_request *req, uint32_t ioapic_id, uint64_t rte)
+{
+    ASSERT(req);
+    req->type = VIOMMU_REQUEST_IRQ_APIC;
+    req->source_id = ioapic_id;
+    req->msg.rte = rte;
+}
+
 #endif /* __ARCH_X86_VIOMMU_H__ */
 
 /*
