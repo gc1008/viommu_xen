@@ -47,7 +47,12 @@
 #define DMAR_IQH_REG            0x80 /* invalidation queue head */
 #define DMAR_IQT_REG            0x88 /* invalidation queue tail */
 #define DMAR_IQA_REG            0x90 /* invalidation queue addr */
+#define DMAR_IQUA_REG           0x94 /* invalidation queue upper addr */
+#define DMAR_ICS_REG            0x9c /* invalidation completion status */
 #define DMAR_IECTL_REG          0xa0 /* invalidation event control register */
+#define DMAR_IEDATA_REG         0xa4 /* invalidation event data register */
+#define DMAR_IEADDR_REG         0xa8 /* invalidation event address register */
+#define DMAR_IEUADDR_REG        0xac /* upper address register */
 #define DMAR_IRTA_REG           0xb8 /* base address of intr remap table */
 #define DMAR_IRTUA_REG          0xbc /* upper address of intr remap table */
 
@@ -175,6 +180,21 @@
 #define DMA_IRTA_S(val)         (val & 0xf)
 #define DMA_IRTA_SIZE(val)      (1UL << (DMA_IRTA_S(val) + 1))
 
+/* IQA_REG */
+#define DMA_IQA_ADDR(val)       (val & ~0xfffULL)
+#define DMA_IQA_QS(val)         (val & 0x7)
+#define DMA_IQA_RSVD            0xff8ULL
+
+/* IECTL_REG */
+#define DMA_IECTL_IM_SHIFT 31
+#define DMA_IECTL_IM            (1U << DMA_IECTL_IM_SHIFT)
+#define DMA_IECTL_IP_SHIFT 30
+#define DMA_IECTL_IP            (1U << DMA_IECTL_IP_SHIFT)
+
+/* ICS_REG */
+#define DMA_ICS_IWC_SHIFT       0
+#define DMA_ICS_IWC             (1U << DMA_ICS_IWC_SHIFT)
+
 /* PMEN_REG */
 #define DMA_PMEN_EPM    (((u32)1) << 31)
 #define DMA_PMEN_PRS    (((u32)1) << 0)
@@ -205,13 +225,14 @@
 /* FSTS_REG */
 #define DMA_FSTS_PFO_SHIFT  0
 #define DMA_FSTS_PPF_SHIFT  1
+#define DMA_FSTS_IQE_SHIFT  4
 #define DMA_FSTS_PRO_SHIFT  7
 
 #define DMA_FSTS_PFO        ((uint32_t)1 << DMA_FSTS_PFO_SHIFT)
 #define DMA_FSTS_PPF        ((uint32_t)1 << DMA_FSTS_PPF_SHIFT)
 #define DMA_FSTS_AFO        ((uint32_t)1 << 2)
 #define DMA_FSTS_APF        ((uint32_t)1 << 3)
-#define DMA_FSTS_IQE        ((uint32_t)1 << 4)
+#define DMA_FSTS_IQE        ((uint32_t)1 << DMA_FSTS_IQE_SHIFT)
 #define DMA_FSTS_ICE        ((uint32_t)1 << 5)
 #define DMA_FSTS_ITE        ((uint32_t)1 << 6)
 #define DMA_FSTS_PRO        ((uint32_t)1 << DMA_FSTS_PRO_SHIFT)
@@ -555,6 +576,7 @@ struct qinval_entry {
 
 /* Queue invalidation head/tail shift */
 #define QINVAL_INDEX_SHIFT 4
+#define QINVAL_INDEX_MASK  0x7fff0ULL
 
 #define qinval_present(v) ((v).lo & 1)
 #define qinval_fault_disable(v) (((v).lo >> 1) & 1)
