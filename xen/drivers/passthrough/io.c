@@ -872,16 +872,35 @@ static void __msi_pirq_eoi(struct hvm_pirq_dpci *pirq_dpci)
 static int _hvm_dpci_msi_eoi(struct domain *d,
                              struct hvm_pirq_dpci *pirq_dpci, void *arg)
 {
-    int vector = (long)arg;
-
-    if ( (pirq_dpci->flags & HVM_IRQ_DPCI_MACH_MSI) &&
-         (pirq_dpci->gmsi.gvec == vector) )
+    if ( pirq_dpci->flags & HVM_IRQ_DPCI_MACH_MSI )
     {
-        uint32_t dest = MASK_EXTR(pirq_dpci->gmsi.addr, MSI_ADDR_DEST_ID_MASK);
-        bool dest_mode = pirq_dpci->gmsi.addr & MSI_ADDR_DESTMODE_MASK;
+        uint8_t vector, vector_target = (long)arg;
+        uint32_t dest;
+        bool dm;
+        struct arch_irq_remapping_request request;
 
-        if ( vlapic_match_dest(vcpu_vlapic(current), NULL, 0, dest,
-                               dest_mode) )
+        irq_request_msi_fill(&request, pirq_dpci->gmsi.addr,
+                             pirq_dpci->gmsi.data);
+        if ( viommu_check_irq_remapping(d, &request) )
+        {
+            struct arch_irq_remapping_info info;
+
+            if ( viommu_get_irq_info(d, &request, &info) )
+                return 0;
+
+            vector = info.vector;
+            dest = info.dest;
+            dm = info.dest_mode;
+        }
+        else
+        {
+            vector = pirq_dpci->gmsi.data & MSI_DATA_VECTOR_MASK;
+            dest = MASK_EXTR(pirq_dpci->gmsi.addr, MSI_ADDR_DEST_ID_MASK);
+            dm = pirq_dpci->gmsi.addr & MSI_ADDR_DESTMODE_MASK;
+        }
+
+        if ( vector == vector_target &&
+             vlapic_match_dest(vcpu_vlapic(current), NULL, 0, dest, dm) )
         {
             __msi_pirq_eoi(pirq_dpci);
             return 1;

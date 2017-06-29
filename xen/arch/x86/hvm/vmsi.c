@@ -31,6 +31,7 @@
 #include <xen/errno.h>
 #include <xen/sched.h>
 #include <xen/irq.h>
+#include <xen/viommu.h>
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/vpic.h>
@@ -101,21 +102,29 @@ int vmsi_deliver(
 
 void vmsi_deliver_pirq(struct domain *d, const struct hvm_pirq_dpci *pirq_dpci)
 {
-    uint8_t vector = pirq_dpci->gmsi.data & MSI_DATA_VECTOR_MASK;
-    uint8_t dest = MASK_EXTR(pirq_dpci->gmsi.addr, MSI_ADDR_DEST_ID_MASK);
-    bool dest_mode = pirq_dpci->gmsi.addr & MSI_ADDR_DESTMODE_MASK;
-    uint8_t delivery_mode = MASK_EXTR(pirq_dpci->gmsi.data,
-                                      MSI_DATA_DELIVERY_MODE_MASK);
-    bool trig_mode = pirq_dpci->gmsi.data & MSI_DATA_TRIGGER_MASK;
-
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
-                "msi: dest=%x dest_mode=%x delivery_mode=%x "
-                "vector=%x trig_mode=%x\n",
-                dest, dest_mode, delivery_mode, vector, trig_mode);
+    struct arch_irq_remapping_request request;
 
     ASSERT(pirq_dpci->flags & HVM_IRQ_DPCI_GUEST_MSI);
 
-    vmsi_deliver(d, vector, dest, dest_mode, delivery_mode, trig_mode);
+    irq_request_msi_fill(&request, pirq_dpci->gmsi.addr, pirq_dpci->gmsi.data);
+    if ( viommu_check_irq_remapping(d, &request) )
+        viommu_handle_irq_request(d, &request);
+    else
+    {
+        uint8_t vector = pirq_dpci->gmsi.data & MSI_DATA_VECTOR_MASK;
+        uint8_t dest = MASK_EXTR(pirq_dpci->gmsi.addr, MSI_ADDR_DEST_ID_MASK);
+        bool dest_mode = pirq_dpci->gmsi.addr & MSI_ADDR_DESTMODE_MASK;
+        uint8_t delivery_mode = MASK_EXTR(pirq_dpci->gmsi.data,
+                                          MSI_DATA_DELIVERY_MODE_MASK);
+        bool trig_mode = pirq_dpci->gmsi.data & MSI_DATA_TRIGGER_MASK;
+
+        HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
+                    "msi: dest=%x dest_mode=%x delivery_mode=%x "
+                    "vector=%x trig_mode=%x\n",
+                    dest, dest_mode, delivery_mode, vector, trig_mode);
+
+        vmsi_deliver(d, vector, dest, dest_mode, delivery_mode, trig_mode);
+    }
 }
 
 /* Return value, -1 : multi-dests, non-negative value: dest_vcpu_id */
