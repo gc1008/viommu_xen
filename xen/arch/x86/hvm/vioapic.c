@@ -560,11 +560,23 @@ int vioapic_get_vector(const struct domain *d, unsigned int gsi)
 {
     unsigned int pin;
     const struct hvm_vioapic *vioapic = gsi_vioapic(d, gsi, &pin);
+    struct arch_irq_remapping_request request;
 
     if ( !vioapic )
         return -EINVAL;
 
-    return vioapic->redirtbl[pin].fields.vector;
+    irq_request_ioapic_fill(&request, vioapic->id, vioapic->redirtbl[pin].bits);
+    if ( viommu_check_irq_remapping(vioapic->domain, &request) )
+    {
+        struct arch_irq_remapping_info info;
+
+        return unlikely(viommu_get_irq_info(vioapic->domain, &request, &info))
+                   ? : info.vector;
+    }
+    else
+    {
+        return vioapic->redirtbl[pin].fields.vector;
+    }
 }
 
 int vioapic_get_trigger_mode(const struct domain *d, unsigned int gsi)
