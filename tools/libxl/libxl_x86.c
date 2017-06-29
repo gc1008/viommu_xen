@@ -343,8 +343,25 @@ int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     if (d_config->b_info.type != LIBXL_DOMAIN_TYPE_PV) {
         unsigned long shadow = DIV_ROUNDUP(d_config->b_info.shadow_memkb,
                                            1024);
+        unsigned int i;
+
         xc_shadow_control(ctx->xch, domid, XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION,
                           NULL, 0, &shadow, 0, NULL);
+
+        for (i = 0; i < d_config->b_info.num_viommus; i++) {
+            uint32_t id;
+            libxl_viommu_info *viommu = &d_config->b_info.viommu[i];
+
+            if (viommu->type == LIBXL_VIOMMU_TYPE_INTEL_VTD) {
+                ret = xc_viommu_create(ctx->xch, domid, VIOMMU_TYPE_INTEL_VTD,
+                                       viommu->base_addr, viommu->cap, &id);
+                if (ret) {
+                    LOGD(ERROR, domid, "create vIOMMU fail (%d)", ret);
+                    ret = ERROR_FAIL;
+                    goto out;
+                }
+            }
+        }
     }
 
     if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
