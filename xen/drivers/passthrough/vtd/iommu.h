@@ -161,9 +161,10 @@
 #define DMA_GSTS_AFLS   (((u64)1) << 28)
 #define DMA_GSTS_WBFS   (((u64)1) << 27)
 #define DMA_GSTS_QIES   (((u64)1) <<26)
+#define DMA_GSTS_IRES_SHIFT     25
+#define DMA_GSTS_IRES   (((u64)1) << DMA_GSTS_IRES_SHIFT)
 #define DMA_GSTS_SIRTPS_SHIFT   24
 #define DMA_GSTS_SIRTPS (((u64)1) << DMA_GSTS_SIRTPS_SHIFT)
-#define DMA_GSTS_IRES   (((u64)1) <<25)
 #define DMA_GSTS_CFIS   (((u64)1) <<23)
 
 /* IRTA_REG */

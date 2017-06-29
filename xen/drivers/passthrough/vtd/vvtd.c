@@ -24,6 +24,7 @@
 #include <xen/xmalloc.h>
 #include <asm/current.h>
 #include <asm/hvm/domain.h>
+#include <asm/p2m.h>
 
 #include "iommu.h"
 
@@ -37,6 +38,7 @@
 
 struct hvm_hw_vvtd {
     bool eim_enabled;
+    bool intremap_enabled;
 
     /* Interrupt remapping table base gfn and the max of entries */
     uint16_t irt_max_entry;
@@ -52,6 +54,7 @@ struct vvtd {
     struct domain *domain;
 
     struct hvm_hw_vvtd hw;
+    void *irt_base;
 };
 
 /* Setting viommu_verbose enables debugging messages of vIOMMU */
@@ -118,6 +121,77 @@ static void *domain_vvtd(const struct domain *d)
         return NULL;
 }
 
+static void *map_guest_pages(struct domain *d, uint64_t gfn, uint32_t nr)
+{
+    mfn_t *mfn = xmalloc_array(mfn_t, nr);
+    void* ret;
+    int i;
+
+    if ( !mfn )
+        return NULL;
+
+    for ( i = 0; i < nr; i++)
+    {
+        struct page_info *p = get_page_from_gfn(d, gfn + i, NULL, P2M_ALLOC);
+
+        if ( !p || !get_page_type(p, PGT_writable_page) )
+        {
+            if ( p )
+                put_page(p);
+            goto undo;
+        }
+
+        mfn[i] = _mfn(page_to_mfn(p));
+    }
+
+    ret = vmap(mfn, nr);
+    if ( ret == NULL )
+        goto undo;
+    xfree(mfn);
+
+    return ret;
+
+ undo:
+    for ( ; --i >= 0; )
+        put_page_and_type(mfn_to_page(mfn_x(mfn[i])));
+    xfree(mfn);
+    gprintk(XENLOG_ERR, "Failed to map guest pages %lx nr %x\n", gfn, nr);
+
+    return NULL;
+}
+
+static void unmap_guest_pages(void *va, uint32_t nr)
+{
+    unsigned long *mfn = xmalloc_array(unsigned long, nr);
+    int i;
+    void *va_copy = va;
+
+    if ( !mfn )
+    {
+        printk("%s %d: No free memory\n", __FILE__, __LINE__);
+        return;
+    }
+
+    for ( i = 0; i < nr; i++, va += PAGE_SIZE)
+        mfn[i] = domain_page_map_to_mfn(va);
+
+    vunmap(va_copy);
+
+    for ( i = 0; i < nr; i++)
+        put_page_and_type(mfn_to_page(mfn[i]));
+}
+
+static void write_gcmd_ire(struct vvtd *vvtd, uint32_t val)
+{
+    bool set = val & DMA_GCMD_IRE;
+
+    vvtd_info("%sable Interrupt Remapping\n", set ? "En" : "Dis");
+
+    vvtd->hw.intremap_enabled = set;
+    (set ? vvtd_set_bit : vvtd_clear_bit)
+        (vvtd, DMAR_GSTS_REG, DMA_GSTS_IRES_SHIFT);
+}
+
 static void write_gcmd_sirtp(struct vvtd *vvtd, uint32_t val)
 {
     uint64_t irta = vvtd_get_reg_quad(vvtd, DMAR_IRTA_REG);
@@ -131,16 +205,29 @@ static void write_gcmd_sirtp(struct vvtd *vvtd, uint32_t val)
      * the 'Set Interrupt Remap Table Pointer' operation.
      */
     vvtd_clear_bit(vvtd, DMAR_GSTS_REG, DMA_GSTS_SIRTPS_SHIFT);
+    if ( vvtd->hw.intremap_enabled )
+        vvtd_info("Update Interrupt Remapping Table when active\n");
 
     if ( gfn_x(vvtd->hw.irt) != PFN_DOWN(DMA_IRTA_ADDR(irta)) ||
          vvtd->hw.irt_max_entry != DMA_IRTA_SIZE(irta) )
     {
+        if ( vvtd->irt_base )
+        {
+            unmap_guest_pages(vvtd->irt_base,
+                              PFN_UP(vvtd->hw.irt_max_entry *
+                                     sizeof(struct iremap_entry)));
+            vvtd->irt_base = NULL;
+        }
         vvtd->hw.irt = _gfn(PFN_DOWN(DMA_IRTA_ADDR(irta)));
         vvtd->hw.irt_max_entry = DMA_IRTA_SIZE(irta);
         vvtd->hw.eim_enabled = !!(irta & IRTA_EIME);
         vvtd_info("Update IR info (addr=%lx eim=%d size=%d)\n",
                   gfn_x(vvtd->hw.irt), vvtd->hw.eim_enabled,
                   vvtd->hw.irt_max_entry);
+
+        vvtd->irt_base = map_guest_pages(vvtd->domain, gfn_x(vvtd->hw.irt),
+                                         PFN_UP(vvtd->hw.irt_max_entry *
+                                                sizeof(struct iremap_entry)));
     }
     vvtd_set_bit(vvtd, DMAR_GSTS_REG, DMA_GSTS_SIRTPS_SHIFT);
 }
@@ -162,6 +249,8 @@ static void vvtd_write_gcmd(struct vvtd *vvtd, uint32_t val)
 
     if ( changed & DMA_GCMD_SIRTP )
         write_gcmd_sirtp(vvtd, val);
+    if ( changed & DMA_GCMD_IRE )
+        write_gcmd_ire(vvtd, val);
 }
 
 static int vvtd_in_range(struct vcpu *v, unsigned long addr)
@@ -278,7 +367,16 @@ static int vvtd_destroy(struct viommu *viommu)
     struct vvtd *vvtd = viommu->priv;
 
     if ( vvtd )
+    {
+        if ( vvtd->irt_base )
+        {
+            unmap_guest_pages(vvtd->irt_base,
+                              PFN_UP(vvtd->hw.irt_max_entry *
+                                     sizeof(struct iremap_entry)));
+            vvtd->irt_base = NULL;
+        }
         xfree(vvtd);
+    }
 
     return 0;
 }
