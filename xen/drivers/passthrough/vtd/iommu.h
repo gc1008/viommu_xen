@@ -47,6 +47,7 @@
 #define DMAR_IQH_REG            0x80 /* invalidation queue head */
 #define DMAR_IQT_REG            0x88 /* invalidation queue tail */
 #define DMAR_IQA_REG            0x90 /* invalidation queue addr */
+#define DMAR_IECTL_REG          0xa0 /* invalidation event control register */
 #define DMAR_IRTA_REG           0xb8 /* intr remap */
 
 #define OFFSET_STRIDE        (9)
@@ -89,6 +90,12 @@
 #define cap_afl(c)        (((c) >> 3) & 1)
 #define cap_ndoms(c)        (1 << (4 + 2 * ((c) & 0x7)))
 
+#define cap_set_num_fault_regs(c)   ((((c) - 1) & 0xff) << 40)
+#define cap_set_fault_reg_offset(c) ((((c) / 16) & 0x3ff) << 24)
+#define cap_set_mgaw(c)             ((((c) - 1) & 0x3f) << 16)
+#define cap_set_sagaw(c)            (((c) & 0x1f) << 8)
+#define cap_set_ndoms(c)            ((c) & 0x7)
+
 /*
  * Extended Capability Register
  */
@@ -113,6 +120,8 @@
 
 #define ecap_niotlb_iunits(e)    ((((e) >> 24) & 0xff) + 1)
 #define ecap_iotlb_offset(e)     ((((e) >> 8) & 0x3ff) * 16)
+
+#define ecap_set_mhmv(e)         (((e) & 0xf) << 20)
 
 /* IOTLB_REG */
 #define DMA_TLB_FLUSH_GRANU_OFFSET  60
