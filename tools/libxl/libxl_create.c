@@ -59,6 +59,50 @@ void libxl__rdm_setdefault(libxl__gc *gc, libxl_domain_build_info *b_info)
                             LIBXL_RDM_MEM_BOUNDARY_MEMKB_DEFAULT;
 }
 
+static int libxl__viommu_set_default(libxl__gc *gc,
+                                     libxl_domain_build_info *b_info)
+{
+    int i;
+
+    for (i = 0; i < b_info->num_viommus; i++) {
+        libxl_viommu_info *viommu = &b_info->viommu[i];
+
+        if (libxl_defbool_is_default(viommu->intremap))
+            libxl_defbool_set(&viommu->intremap, true);
+
+        if (!libxl_defbool_val(viommu->intremap)) {
+            LOG(ERROR, "Cannot create one virtual VTD without intremap");
+            return ERROR_INVAL;
+        }
+
+        switch (viommu->type) {
+        case LIBXL_VIOMMU_TYPE_INTEL_VTD:
+            /*
+             * If there are multiple vIOMMUs, we need arrange all vIOMMUs to
+             * avoid overlap. Put a check here in case we get here for multiple
+             * vIOMMUs case.
+             */
+            if (b_info->num_viommus > 1) {
+                LOG(ERROR, "Multiple vIOMMUs support is under implementation");
+                return ERROR_INVAL;
+            }
+
+            /* Set default values to unexposed fields */
+            viommu->base_addr = VTD_BASE_ADDRESS;
+
+            /* Set desired capbilities */
+            viommu->cap = VIOMMU_CAP_IRQ_REMAPPING;
+
+            break;
+
+        default:
+            return ERROR_INVAL;
+        }
+    }
+
+    return 0;
+}
+
 int libxl__domain_build_info_setdefault(libxl__gc *gc,
                                         libxl_domain_build_info *b_info)
 {
@@ -217,6 +261,9 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
 
     libxl__arch_domain_build_info_acpi_setdefault(b_info);
     libxl_defbool_setdefault(&b_info->dm_restrict, false);
+
+    if (libxl__viommu_set_default(gc, b_info))
+        return ERROR_FAIL;
 
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:

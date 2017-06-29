@@ -457,6 +457,17 @@ libxl_altp2m_mode = Enumeration("altp2m_mode", [
     (3, "limited"),
     ], init_val = "LIBXL_ALTP2M_MODE_DISABLED")
 
+libxl_viommu_type = Enumeration("viommu_type", [
+    (1, "intel_vtd"),
+    ])
+
+libxl_viommu_info = Struct("viommu_info", [
+    ("type",            libxl_viommu_type),
+    ("intremap",        libxl_defbool),
+    ("cap",             uint64),
+    ("base_addr",       uint64),
+    ])
+
 libxl_domain_build_info = Struct("domain_build_info",[
     ("max_vcpus",       integer),
     ("avail_vcpus",     libxl_bitmap),
@@ -522,6 +533,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("nested_hvm",       libxl_defbool),
     ("apic",             libxl_defbool),
     ("dm_restrict",      libxl_defbool),
+    ("viommu",           Array(libxl_viommu_info, "num_viommus")),
     ("u", KeyedUnion(None, libxl_domain_type, "type",
                 [("hvm", Struct(None, [("firmware",         string),
                                        ("bios",             libxl_bios_type),

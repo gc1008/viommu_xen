@@ -1803,6 +1803,33 @@ L<http://www.microsoft.com/en-us/download/details.aspx?id=30707>
 
 =back 
 
+=item B<viommu=[ "VIOMMU_STRING", "VIOMMU_STRING", ...]>
+
+Specifies the vIOMMUs which are to be provided to the guest.
+
+B<VIOMMU_STRING> has the form C<KEY=VALUE,KEY=VALUE,...> where:
+
+=over 4
+
+=item B<KEY=VALUE>
+
+Possible B<KEY>s are:
+
+=over 4
+
+=item B<type="STRING">
+
+Currently there is only one valid type:
+
+(x86 only) "intel_vtd" means providing a emulated Intel VT-d to the guest.
+
+=item B<intremap=BOOLEAN>
+
+Specifies whether the vIOMMU should support interrupt remapping
+and default 'true'.
+
+=back
+
 =head3 Guest Virtual Time Controls
 
 =over 4

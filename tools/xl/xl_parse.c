@@ -851,6 +851,38 @@ out:
     return rc;
 }
 
+/* Parses viommu data and adds info into viommu
+ * Returns 1 if the input doesn't form a valid viommu
+ * or parsed values are not correct. Successful parse returns 0 */
+static int parse_viommu_config(libxl_viommu_info *viommu, const char *info)
+{
+    char *ptr, *oparg, *saveptr = NULL, *buf = xstrdup(info);
+
+    ptr = strtok_r(buf, ",", &saveptr);
+    if (MATCH_OPTION("type", ptr, oparg)) {
+        if (!strcmp(oparg, "intel_vtd")) {
+            viommu->type = LIBXL_VIOMMU_TYPE_INTEL_VTD;
+        } else {
+            fprintf(stderr, "Invalid viommu type: %s\n", oparg);
+            return 1;
+        }
+    } else {
+        fprintf(stderr, "viommu type should be set first: %s\n", oparg);
+        return 1;
+    }
+
+    for (ptr = strtok_r(NULL, ",", &saveptr); ptr;
+         ptr = strtok_r(NULL, ",", &saveptr)) {
+        if (MATCH_OPTION("intremap", ptr, oparg)) {
+            libxl_defbool_set(&viommu->intremap, strtoul(oparg, NULL, 0));
+        } else {
+            fprintf(stderr, "Unknown string `%s' in viommu spec\n", ptr);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 void parse_config_data(const char *config_source,
                        const char *config_data,
                        int config_len,
@@ -860,7 +892,7 @@ void parse_config_data(const char *config_source,
     long l, vcpus = 0;
     XLU_Config *config;
     XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms,
-                   *usbctrls, *usbdevs, *p9devs, *vdispls;
+                   *usbctrls, *usbdevs, *p9devs, *vdispls, *iommus;
     XLU_ConfigList *channels, *ioports, *irqs, *iomem, *viridian, *dtdevs,
                    *mca_caps;
     int num_ioports, num_irqs, num_iomem, num_cpus, num_viridian, num_mca_caps;
@@ -1198,6 +1230,22 @@ void parse_config_data(const char *config_source,
 
     xlu_cfg_get_defbool(config, "nestedhvm", &b_info->nested_hvm, 0);
     xlu_cfg_get_defbool(config, "apic", &b_info->apic, 0);
+
+    if (!xlu_cfg_get_list (config, "viommu", &iommus, 0, 0)) {
+        while ((buf = xlu_cfg_get_listitem (iommus, b_info->num_viommus))
+                != NULL) {
+            libxl_viommu_info *viommu;
+
+            viommu = ARRAY_EXTEND_INIT_NODEVID(b_info->viommu,
+                                               b_info->num_viommus,
+                                               libxl_viommu_info_init);
+
+            if (parse_viommu_config(viommu, buf)) {
+                fprintf(stderr, "ERROR: invalid viommu setting\n");
+                exit (1);
+            }
+        }
+    }
 
     switch(b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
