@@ -96,8 +96,17 @@ struct acpi_config {
     uint32_t ioapic_base_address;
     uint16_t pci_isa_irq_mask;
     uint8_t ioapic_id;
+
+    /* Emulated IOMMU features, location and IOAPIC under the scope of IOMMU */
+    bool iommu_intremap_supported;
+    uint8_t host_addr_width;
+    uint8_t ioapic_bus;
+    uint16_t ioapic_devfn;
+    uint64_t iommu_base_addr;
 };
 
+struct acpi_dmar *construct_dmar(struct acpi_ctxt *ctxt,
+                                 const struct acpi_config *config);
 int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config);
 
 #endif /* __LIBACPI_H__ */

@@ -23,10 +23,10 @@
 
 #include "config.h"
 #include "smbios_types.h"
+#include "util.h"
 #include "libacpi.h"
 #include "apic_regs.h"
 #include "../rombios/config.h"
-#include "util.h"
 #include "pci_regs.h"
 #include "hypercall.h"
 

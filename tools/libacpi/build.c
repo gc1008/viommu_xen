@@ -303,6 +303,55 @@ static struct acpi_20_slit *construct_slit(struct acpi_ctxt *ctxt,
     return slit;
 }
 
+/*
+ * Only one DMA remapping hardware unit is exposed and all devices
+ * are under the remapping hardware unit. I/O APIC should be explicitly
+ * enumerated.
+ */
+struct acpi_dmar *construct_dmar(struct acpi_ctxt *ctxt,
+                                 const struct acpi_config *config)
+{
+    struct acpi_dmar_hardware_unit *drhd;
+    struct dmar_device_scope *scope;
+    unsigned int ioapic_scope_size = sizeof(*scope) + sizeof(scope->path[0]);
+    unsigned int size = sizeof(struct acpi_dmar) + sizeof(*drhd) +
+                        ioapic_scope_size;
+    struct acpi_dmar *dmar = ctxt->mem_ops.alloc(ctxt, size, 16);
+
+    if ( !dmar )
+        return NULL;
+
+    memset(dmar, 0, size);
+    dmar->header.signature = ACPI_2_0_DMAR_SIGNATURE;
+    dmar->header.revision = ACPI_2_0_DMAR_REVISION;
+    dmar->header.length = size;
+    fixed_strcpy(dmar->header.oem_id, ACPI_OEM_ID);
+    fixed_strcpy(dmar->header.oem_table_id, ACPI_OEM_TABLE_ID);
+    dmar->header.oem_revision = ACPI_OEM_REVISION;
+    dmar->header.creator_id   = ACPI_CREATOR_ID;
+    dmar->header.creator_revision = ACPI_CREATOR_REVISION;
+    dmar->host_address_width = config->host_addr_width - 1;
+    if ( config->iommu_intremap_supported )
+        dmar->flags |= ACPI_DMAR_INTR_REMAP;
+
+    drhd = (struct acpi_dmar_hardware_unit *)((void*)dmar + sizeof(*dmar));
+    drhd->type = ACPI_DMAR_TYPE_DRHD;
+    drhd->length = sizeof(*drhd) + ioapic_scope_size;
+    drhd->flags = ACPI_DMAR_INCLUDE_PCI_ALL;
+    drhd->pci_segment = 0;
+    drhd->base_address = config->iommu_base_addr;
+
+    scope = &drhd->scope[0];
+    scope->type = ACPI_DMAR_DEV_SCOPE_IOAPIC;
+    scope->length = ioapic_scope_size;
+    scope->enumeration_id = config->ioapic_id;
+    scope->bus = config->ioapic_bus;
+    scope->path[0] = config->ioapic_devfn;
+
+    set_checksum(dmar, offsetof(struct acpi_header, checksum), size);
+    return dmar;
+}
+
 static int construct_passthrough_tables(struct acpi_ctxt *ctxt,
                                         unsigned long *table_ptrs,
                                         int nr_tables,
