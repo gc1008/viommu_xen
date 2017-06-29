@@ -1836,3 +1836,10 @@ mode.
 > Default: `true`
 
 Permit use of the `xsave/xrstor` instructions.
+
+### viommu
+> `= <boolean>`
+
+> Default: `false`
+
+Permit use of viommu interface to create and destroy viommu device model.

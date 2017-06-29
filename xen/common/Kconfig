@@ -52,6 +52,9 @@ config HAS_CHECKPOLICY
 	string
 	option env="XEN_HAS_CHECKPOLICY"
 
+config VIOMMU
+	bool
+
 config KEXEC
 	bool "kexec support"
 	default y

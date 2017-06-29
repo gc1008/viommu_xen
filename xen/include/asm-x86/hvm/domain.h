@@ -21,6 +21,7 @@
 #define __ASM_X86_HVM_DOMAIN_H__
 
 #include <xen/iommu.h>
+#include <xen/viommu.h>
 #include <asm/hvm/irq.h>
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/vlapic.h>
@@ -196,6 +197,8 @@ struct hvm_domain {
         struct vmx_domain vmx;
         struct svm_domain svm;
     };
+
+    struct viommu *viommu;
 };
 
 #define hap_enabled(d)  ((d)->arch.hvm_domain.hap_enabled)

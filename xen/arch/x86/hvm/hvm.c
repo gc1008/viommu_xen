@@ -36,6 +36,7 @@
 #include <xen/rangeset.h>
 #include <xen/monitor.h>
 #include <xen/warning.h>
+#include <xen/viommu.h>
 #include <asm/shadow.h>
 #include <asm/hap.h>
 #include <asm/current.h>
@@ -693,6 +694,8 @@ void hvm_domain_relinquish_resources(struct domain *d)
         pmtimer_deinit(d);
         hpet_deinit(d);
     }
+
+    viommu_destroy_domain(d);
 }
 
 void hvm_domain_destroy(struct domain *d)

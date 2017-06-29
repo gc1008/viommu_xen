@@ -56,6 +56,7 @@ obj-y += time.o
 obj-y += timer.o
 obj-y += trace.o
 obj-y += version.o
+obj-$(CONFIG_VIOMMU) += viommu.o
 obj-y += virtual_region.o
 obj-y += vm_event.o
 obj-y += vmap.o

@@ -25,6 +25,7 @@
 #include <xen/paging.h>
 #include <xen/hypercall.h>
 #include <xen/vm_event.h>
+#include <xen/viommu.h>
 #include <xen/monitor.h>
 #include <asm/current.h>
 #include <asm/irq.h>
@@ -1153,6 +1154,12 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_set_gnttab_limits:
         ret = grant_table_set_limits(d, op->u.set_gnttab_limits.grant_frames,
                                      op->u.set_gnttab_limits.maptrack_frames);
+        break;
+
+    case XEN_DOMCTL_viommu_op:
+        ret = viommu_domctl(d, &op->u.viommu_op);
+        if ( !ret )
+            copyback = 1;
         break;
 
     default:

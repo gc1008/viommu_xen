@@ -231,6 +231,9 @@ SECTIONS
        __start_schedulers_array = .;
        *(.data.schedulers)
        __end_schedulers_array = .;
+       __start_viommus_array = .;
+       *(.data.viommus)
+       __end_viommus_array = .;
   } :text
 
   .data : {                    /* Data */

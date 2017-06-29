@@ -1105,6 +1105,35 @@ struct xen_domctl_vuart_op {
                                  */
 };
 
+/*  vIOMMU helper
+ *
+ * vIOMMU interface can be used to create vIOMMU.
+ */
+
+struct xen_domctl_viommu_op {
+    uint32_t cmd;
+#define XEN_DOMCTL_viommu_create        0
+    union {
+        struct {
+            /* IN - vIOMMU type */
+            uint8_t type;
+#define VIOMMU_TYPE_INTEL_VTD           0
+            /* 
+             * IN - MMIO base address of vIOMMU. vIOMMU device models
+             * are in charge of to check base_address.
+             */
+            uint64_t base_address;
+            /* IN - Capabilities with which we want to create */
+            uint64_t capabilities;
+#define VIOMMU_CAP_IRQ_REMAPPING        (1u << 0)
+            /* OUT - vIOMMU identity */
+            uint32_t id;
+        } create;
+    } u;
+};
+typedef struct xen_domctl_viommu_op xen_domctl_viommu_op;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_viommu_op);
+
 struct xen_domctl {
     uint32_t cmd;
 #define XEN_DOMCTL_createdomain                   1
@@ -1184,6 +1213,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_soft_reset                    79
 #define XEN_DOMCTL_set_gnttab_limits             80
 #define XEN_DOMCTL_vuart_op                      81
+#define XEN_DOMCTL_viommu_op                     82
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -1248,6 +1278,7 @@ struct xen_domctl {
         struct xen_domctl_psr_cat_op        psr_cat_op;
         struct xen_domctl_set_gnttab_limits set_gnttab_limits;
         struct xen_domctl_vuart_op          vuart_op;
+        struct xen_domctl_viommu_op         viommu_op;
         uint8_t                             pad[128];
     } u;
 };
