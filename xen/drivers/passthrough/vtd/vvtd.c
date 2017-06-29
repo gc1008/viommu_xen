@@ -94,6 +94,60 @@ static inline uint64_t vvtd_get_reg_quad(const struct vvtd *vvtd, uint32_t reg)
     return *(uint64_t*)VVTD_REG_POS(vvtd, reg);
 }
 
+static void *domain_vvtd(const struct domain *d)
+{
+    if ( is_hvm_domain(d) && d->arch.hvm_domain.viommu )
+        return d->arch.hvm_domain.viommu->priv;
+    else
+        return NULL;
+}
+
+static int vvtd_in_range(struct vcpu *v, unsigned long addr)
+{
+    struct vvtd *vvtd = domain_vvtd(v->domain);
+
+    if ( vvtd )
+        return (addr >= vvtd->base_addr) &&
+               (addr < vvtd->base_addr + VVTD_MAX_OFFSET);
+    return 0;
+}
+
+static int vvtd_read(struct vcpu *v, unsigned long addr,
+                     unsigned int len, unsigned long *pval)
+{
+    struct vvtd *vvtd = domain_vvtd(v->domain);
+    unsigned int offset = addr - vvtd->base_addr;
+
+    vvtd_info("Read offset %x len %d\n", offset, len);
+
+    if ( (len != 4 && len != 8) || (offset & (len - 1)) )
+        return X86EMUL_OKAY;
+
+    if ( len == 4 )
+        *pval = vvtd_get_reg(vvtd, offset);
+    else
+        *pval = vvtd_get_reg_quad(vvtd, offset);
+
+    return X86EMUL_OKAY;
+}
+
+static int vvtd_write(struct vcpu *v, unsigned long addr,
+                      unsigned int len, unsigned long val)
+{
+    struct vvtd *vvtd = domain_vvtd(v->domain);
+    unsigned int offset = addr - vvtd->base_addr;
+
+    vvtd_info("Write offset %x len %d val %lx\n", offset, len, val);
+
+    return X86EMUL_OKAY;
+}
+
+static const struct hvm_mmio_ops vvtd_mmio_ops = {
+    .check = vvtd_in_range,
+    .read = vvtd_read,
+    .write = vvtd_write
+};
+
 static void vvtd_reset(struct vvtd *vvtd)
 {
     uint64_t cap = cap_set_num_fault_regs(VVTD_FRCD_NUM)
@@ -126,6 +180,7 @@ static int vvtd_create(struct domain *d, struct viommu *viommu)
     vvtd_reset(vvtd);
     vvtd->base_addr = viommu->base_address;
     vvtd->domain = d;
+    register_mmio_handler(d, &vvtd_mmio_ops);
 
     viommu->priv = vvtd;
 
