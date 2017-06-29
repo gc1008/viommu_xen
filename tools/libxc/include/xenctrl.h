@@ -2537,6 +2537,9 @@ enum xc_static_cpu_featuremask {
 const uint32_t *xc_get_static_cpu_featuremask(enum xc_static_cpu_featuremask);
 const uint32_t *xc_get_feature_deep_deps(uint32_t feature);
 
+int xc_viommu_create(xc_interface *xch, domid_t dom, uint64_t type,
+                     uint64_t base_addr, uint64_t cap, uint32_t *viommu_id);
+
 #endif
 
 int xc_livepatch_upload(xc_interface *xch,
