@@ -539,6 +539,20 @@ static void write_gcmd_ire(struct vvtd *vvtd, uint32_t val)
         (vvtd, DMAR_GSTS_REG, DMA_GSTS_IRES_SHIFT);
 }
 
+static void write_gcmd_qie(struct vvtd *vvtd, uint32_t val)
+{
+    bool set = val & DMA_GCMD_QIE;
+
+    vvtd_info("%sable Queue Invalidation\n", set ? "En" : "Dis");
+
+    if ( set )
+        vvtd_set_reg_quad(vvtd, DMAR_IQH_REG, 0);
+
+    (set ? vvtd_set_bit : vvtd_clear_bit)
+        (vvtd, DMAR_GSTS_REG, DMA_GSTS_QIES_SHIFT);
+
+}
+
 static void write_gcmd_sirtp(struct vvtd *vvtd, uint32_t val)
 {
     uint64_t irta = vvtd_get_reg_quad(vvtd, DMAR_IRTA_REG);
@@ -598,6 +612,10 @@ static void vvtd_write_gcmd(struct vvtd *vvtd, uint32_t val)
         write_gcmd_sirtp(vvtd, val);
     if ( changed & DMA_GCMD_IRE )
         write_gcmd_ire(vvtd, val);
+    if ( changed & DMA_GCMD_QIE )
+        write_gcmd_qie(vvtd, val);
+    if ( changed & ~(DMA_GCMD_SIRTP | DMA_GCMD_IRE | DMA_GCMD_QIE) )
+        vvtd_info("Only SIRTP, IRE, QIE in GCMD are handled");
 }
 
 static int vvtd_in_range(struct vcpu *v, unsigned long addr)

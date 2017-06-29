@@ -160,7 +160,8 @@
 #define DMA_GSTS_FLS    (((u64)1) << 29)
 #define DMA_GSTS_AFLS   (((u64)1) << 28)
 #define DMA_GSTS_WBFS   (((u64)1) << 27)
-#define DMA_GSTS_QIES   (((u64)1) <<26)
+#define DMA_GSTS_QIES_SHIFT     26
+#define DMA_GSTS_QIES   (((u64)1) << DMA_GSTS_QIES_SHIFT)
 #define DMA_GSTS_IRES_SHIFT     25
 #define DMA_GSTS_IRES   (((u64)1) << DMA_GSTS_IRES_SHIFT)
 #define DMA_GSTS_SIRTPS_SHIFT   24
