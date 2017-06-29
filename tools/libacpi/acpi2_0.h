@@ -422,6 +422,65 @@ struct acpi_20_slit {
 };
 
 /*
+ * DMA Remapping Table header definition (DMAR)
+ */
+
+/*
+ * DMAR Flags.
+ */
+#define ACPI_DMAR_INTR_REMAP        (1 << 0)
+#define ACPI_DMAR_X2APIC_OPT_OUT    (1 << 1)
+
+struct acpi_dmar {
+    struct acpi_header header;
+    uint8_t host_address_width;
+    uint8_t flags;
+    uint8_t reserved[10];
+};
+
+/*
+ * Device Scope Types
+ */
+#define ACPI_DMAR_DEV_SCOPE_PCI_ENDPOINT        0x01
+#define ACPI_DMAR_DEV_SCOPE_PCI_SUB_HRCHY       0x02
+#define ACPI_DMAR_DEV_SCOPE_IOAPIC              0x03
+#define ACPI_DMAR_DEV_SCOPE_HPET                0x04
+#define ACPI_DMAR_DEV_SCOPE_ACPI_NS_DEV         0x05
+
+struct dmar_device_scope {
+    uint8_t type;
+    uint8_t length;
+    uint8_t reserved[2];
+    uint8_t enumeration_id;
+    uint8_t bus;
+    uint16_t path[0];
+};
+
+/*
+ * DMA Remapping Hardware Unit Types
+ */
+#define ACPI_DMAR_TYPE_DRHD     0x00
+#define ACPI_DMAR_TYPE_RMRR     0x01
+#define ACPI_DMAR_TYPE_ATSR     0x02
+#define ACPI_DMAR_TYPE_RHSA     0x03
+#define ACPI_DMAR_TYPE_ANDD     0x04
+
+/*
+ * DMA Remapping Hardware Unit Flags. All other bits are reserved and must be 0.
+ */
+#define ACPI_DMAR_INCLUDE_PCI_ALL   (1 << 0)
+
+struct acpi_dmar_hardware_unit {
+    uint16_t type;
+    uint16_t length;
+    uint8_t flags;
+    uint8_t reserved;
+    uint16_t pci_segment;
+    uint64_t base_address;
+    struct dmar_device_scope scope[0];
+};
+
+/*
  * Table Signatures.
  */
 #define ACPI_2_0_RSDP_SIGNATURE ASCII64('R','S','D',' ','P','T','R',' ')
@@ -435,6 +494,7 @@ struct acpi_20_slit {
 #define ACPI_2_0_WAET_SIGNATURE ASCII32('W','A','E','T')
 #define ACPI_2_0_SRAT_SIGNATURE ASCII32('S','R','A','T')
 #define ACPI_2_0_SLIT_SIGNATURE ASCII32('S','L','I','T')
+#define ACPI_2_0_DMAR_SIGNATURE ASCII32('D','M','A','R')
 
 /*
  * Table revision numbers.
@@ -449,6 +509,7 @@ struct acpi_20_slit {
 #define ACPI_1_0_FADT_REVISION 0x01
 #define ACPI_2_0_SRAT_REVISION 0x01
 #define ACPI_2_0_SLIT_REVISION 0x01
+#define ACPI_2_0_DMAR_REVISION 0x01
 
 #pragma pack ()
 
