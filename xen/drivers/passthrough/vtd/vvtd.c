@@ -541,6 +541,30 @@ static int vvtd_handle_irq_request(const struct domain *d,
     return ret;
 }
 
+static int vvtd_get_irq_info(const struct domain *d,
+                             const struct arch_irq_remapping_request *irq,
+                             struct arch_irq_remapping_info *info)
+{
+    int ret;
+    struct iremap_entry irte;
+    struct vvtd *vvtd = domain_vvtd(d);
+
+    if ( !vvtd )
+        return -ENODEV;
+
+    ret = vvtd_get_entry(vvtd, irq, &irte);
+    /* not in an interrupt delivery, don't report faults to guest */
+    if ( ret )
+        return ret;
+
+    info->vector = irte.remap.vector;
+    info->dest = irte_dest(vvtd, irte.remap.dst);
+    info->dest_mode = irte.remap.dm;
+    info->delivery_mode = irte.remap.dlm;
+
+    return 0;
+}
+
 static void vvtd_reset(struct vvtd *vvtd)
 {
     uint64_t cap = cap_set_num_fault_regs(VVTD_FRCD_NUM)
@@ -603,6 +627,7 @@ static const struct viommu_ops vvtd_hvm_vmx_ops = {
     .create = vvtd_create,
     .destroy = vvtd_destroy,
     .handle_irq_request = vvtd_handle_irq_request,
+    .get_irq_info = vvtd_get_irq_info,
 };
 
 REGISTER_VIOMMU(vvtd_hvm_vmx_ops);
