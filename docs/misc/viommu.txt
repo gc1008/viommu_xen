@@ -1,0 +1,120 @@
+Xen virtual IOMMU
+
+Motivation
+==========
+Enable more than 128 vcpu support
+
+The current requirements of HPC cloud service requires VM with a high
+number of CPUs in order to achieve high performance in parallel
+computing.
+
+To support >128 vcpus, X2APIC mode in guest is necessary because legacy
+APIC(XAPIC) just supports 8-bit APIC ID. The APIC ID used by Xen is
+CPU ID * 2 (ie: CPU 127 has APIC ID 254, which is the last one available
+in xAPIC mode) and so it only can support 128 vcpus at most. x2APIC mode
+supports 32-bit APIC ID and it requires the interrupt remapping functionality
+of a vIOMMU if the guest wishes to route interrupts to all available vCPUs
+
+PCI MSI/IOAPIC can only send interrupt message containing 8-bit APIC ID,
+which cannot address cpus with >254 APIC ID. Interrupt remapping supports
+32-bit APIC ID and so it's necessary for >128 vcpus support.
+
+vIOMMU Architecture
+===================
+vIOMMU device model is inside Xen hypervisor for following factors
+    1) Avoid round trips between Qemu and Xen hypervisor
+    2) Ease of integration with the rest of hypervisor
+    3) PVH doesn't use Qemu
+
+* Interrupt remapping overview.
+Interrupts from virtual devices and physical devices are delivered
+to vLAPIC from vIOAPIC and vMSI. vIOMMU needs to remap interrupt during
+this procedure.
+
++---------------------------------------------------+
+|Qemu                       |VM                     |
+|                           | +----------------+    |
+|                           | |  Device driver |    |
+|                           | +--------+-------+    |
+|                           |          ^            |
+|       +----------------+  | +--------+-------+    |
+|       | Virtual device |  | |  IRQ subsystem |    |
+|       +-------+--------+  | +--------+-------+    |
+|               |           |          ^            |
+|               |           |          |            |
++---------------------------+-----------------------+
+|hypervisor     |                      | VIRQ       |
+|               |            +---------+--------+   |
+|               |            |      vLAPIC      |   |
+|               |VIRQ        +---------+--------+   |
+|               |                      ^            |
+|               |                      |            |
+|               |            +---------+--------+   |
+|               |            |      vIOMMU      |   |
+|               |            +---------+--------+   |
+|               |                      ^            |
+|               |                      |            |
+|               |            +---------+--------+   |
+|               |            |   vIOAPIC/vMSI   |   |
+|               |            +----+----+--------+   |
+|               |                 ^    ^            |
+|               +-----------------+    |            |
+|                                      |            |
++---------------------------------------------------+
+HW                                     |IRQ
+                                +-------------------+
+                                |   PCI Device      |
+                                +-------------------+
+
+
+vIOMMU hypercall
+================
+Introduce a new domctl hypercall "xen_domctl_viommu_op" to create
+vIOMMUs instance in hypervisor. vIOMMU instance will be destroyed
+during destroying domain.
+
+* vIOMMU hypercall parameter structure
+
+/* vIOMMU type - specify vendor vIOMMU device model */
+#define VIOMMU_TYPE_INTEL_VTD	       0
+
+/* vIOMMU capabilities */
+#define VIOMMU_CAP_IRQ_REMAPPING  (1u << 0)
+
+struct xen_domctl_viommu_op {
+    uint32_t cmd;
+#define XEN_DOMCTL_viommu_create          0
+    union {
+        struct {
+            /* IN - vIOMMU type  */
+            uint8_t type;
+            /* IN - MMIO base address of vIOMMU. */
+            uint64_t base_address;
+            /* IN - Capabilities with which we want to create */
+            uint64_t capabilities;
+            /* OUT - vIOMMU identity */
+            uint32_t id;
+        } create;
+    } u;
+};
+
+- XEN_DOMCTL_create_viommu
+    Create vIOMMU device with type, capabilities and MMIO base address.
+Hypervisor allocates viommu_id for new vIOMMU instance and return back.
+The vIOMMU device model in hypervisor should check whether it can
+support the input capabilities and return error if not.
+
+vIOMMU domctl and vIOMMU option in configure file consider multi-vIOMMU
+support for single VM.(e.g, parameters of create vIOMMU includes vIOMMU id).
+But function implementation only supports one vIOMMU per VM so far.
+
+xl x86 vIOMMU configuration"
+============================
+viommu = [
+    'type=intel_vtd,intremap=1',
+    ...
+]
+
+"type" - Specify vIOMMU device model type. Currently only supports Intel vtd
+device model.
+"intremap" - Enable vIOMMU interrupt remapping function.
