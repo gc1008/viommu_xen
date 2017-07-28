@@ -16,6 +16,7 @@
 #include "libxl_arch.h"
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/e820.h>
+#include "libacpi/acpi2_0.h"
 #include "libacpi/libacpi.h"
 
 #include <xc_dom.h>
@@ -100,6 +101,25 @@ static int init_acpi_config(libxl__gc *gc,
     struct hvm_info_table *hvminfo;
     int i, r, rc;
 
+    if ((b_info->num_viommus == 1) &&
+        (b_info->viommu[0].type == LIBXL_VIOMMU_TYPE_INTEL_VTD)) {
+        if (libxl_defbool_val(b_info->viommu[0].intremap))
+            config->iommu_intremap_supported = true;
+        config->iommu_base_addr = b_info->viommu[0].base_addr;
+
+        /* IOAPIC id and PSEUDO BDF */
+        config->ioapic_id = 1;
+        config->ioapic_bus = 0xff;
+        config->ioapic_devfn = 0x0;
+
+        config->host_addr_width = 39;
+        config->table_flags |= ACPI_HAS_DMAR;
+    }
+
+    if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
+        return 0;
+    }
+
     config->dsdt_anycpu = config->dsdt_15cpu = dsdt_pvh;
     config->dsdt_anycpu_len = config->dsdt_15cpu_len = dsdt_pvh_len;
 
@@ -161,9 +181,9 @@ out:
     return rc;
 }
 
-int libxl__dom_load_acpi(libxl__gc *gc,
-                         const libxl_domain_build_info *b_info,
-                         struct xc_dom_image *dom)
+static int libxl__dom_load_acpi_pvh(libxl__gc *gc,
+                                    const libxl_domain_build_info *b_info,
+                                    struct xc_dom_image *dom)
 {
     struct acpi_config config = {0};
     struct libxl_acpi_ctxt libxl_ctxt;
@@ -235,6 +255,78 @@ out:
     return rc;
 }
 
+static void *acpi_memalign(struct acpi_ctxt *ctxt, uint32_t size,
+                           uint32_t align)
+{
+    int ret;
+    void *ptr;
+
+    ret = posix_memalign(&ptr, align, size);
+    if (ret != 0 || !ptr)
+        return NULL;
+
+    return ptr;
+}
+
+/*
+ * For hvm, we don't need build acpi in libxl. Instead, it's built in hvmloader.
+ * But if one hvm has virtual VTD(s), we build DMAR table for it and joint this
+ * table with existing content in acpi_modules in order to employ HVM
+ * firmware pass-through mechanism to pass-through DMAR table.
+ */
+static int libxl__dom_load_acpi_hvm(libxl__gc *gc,
+                                    const libxl_domain_build_info *b_info,
+                                    struct xc_dom_image *dom)
+{
+    struct acpi_config config = { 0 };
+    struct acpi_ctxt ctxt;
+    struct acpi_dmar *dmar;
+    uint32_t len;
+
+    ctxt.mem_ops.alloc = acpi_memalign;
+    ctxt.mem_ops.v2p = virt_to_phys;
+    ctxt.mem_ops.free = acpi_mem_free;
+
+    init_acpi_config(gc, dom, b_info, &config);
+    dmar = construct_dmar(&ctxt, &config);
+    if ( !dmar )
+        return ERROR_NOMEM;
+    len = dmar->header.length;
+
+    if (len) {
+        libxl__ptr_add(gc, dmar);
+        if (!dom->acpi_modules[0].data) {
+            dom->acpi_modules[0].data = (void *)dmar;
+            dom->acpi_modules[0].length = len;
+        } else {
+            /* joint tables */
+            void *newdata;
+
+            newdata = libxl__malloc(gc, len + dom->acpi_modules[0].length);
+            memcpy(newdata, dom->acpi_modules[0].data,
+                   dom->acpi_modules[0].length);
+            memcpy(newdata + dom->acpi_modules[0].length, dmar, len);
+
+            free(dom->acpi_modules[0].data);
+            dom->acpi_modules[0].data = newdata;
+            dom->acpi_modules[0].length += len;
+        }
+    }
+    return 0;
+}
+
+int libxl__dom_load_acpi(libxl__gc *gc,
+                         const libxl_domain_build_info *b_info,
+                         struct xc_dom_image *dom)
+{
+
+    if (b_info->type == LIBXL_DOMAIN_TYPE_PVH)
+        return libxl__dom_load_acpi_pvh(gc, b_info, dom);
+    else if (b_info->type == LIBXL_DOMAIN_TYPE_HVM)
+        return libxl__dom_load_acpi_hvm(gc, b_info, dom);
+
+    return -EINVAL;
+}
 /*
  * Local variables:
  * mode: C

@@ -36,6 +36,7 @@
 #define ACPI_HAS_8042              (1<<13)
 #define ACPI_HAS_CMOS_RTC          (1<<14)
 #define ACPI_HAS_SSDT_LAPTOP_SLATE (1<<15)
+#define ACPI_HAS_DMAR              (1<<16)
 
 struct xen_vmemrange;
 struct acpi_numa {

@@ -383,7 +383,9 @@ int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
 {
     int rc = 0;
 
-    if (info->type == LIBXL_DOMAIN_TYPE_PVH) {
+
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM
+            || info->type == LIBXL_DOMAIN_TYPE_PVH) {
         rc = libxl__dom_load_acpi(gc, info, dom);
         if (rc != 0)
             LOGE(ERROR, "libxl_dom_load_acpi failed");

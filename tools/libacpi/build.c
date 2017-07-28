@@ -517,6 +517,18 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
             printf("Failed to build SLIT, skipping...\n");
     }
 
+    /* DMAR */
+    if ( config->table_flags & ACPI_HAS_DMAR )
+    {
+        struct acpi_dmar *dmar = construct_dmar(ctxt, config);
+
+        if ( dmar )
+            table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, dmar);
+        else
+            printf("Failed to build DMAR, skipping...\n");
+    }
+
+
     /* Load any additional tables passed through. */
     nr_tables += construct_passthrough_tables(ctxt, table_ptrs,
                                               nr_tables, config);
