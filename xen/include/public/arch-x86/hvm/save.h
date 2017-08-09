@@ -639,10 +639,26 @@ struct hvm_msr {
 
 #define CPU_MSR_CODE  20
 
+#define VVTD_MAX_OFFSET 0xd0
+struct hvm_hw_vvtd
+{
+    uint32_t eim_enabled : 1,
+             intremap_enabled : 1;
+    uint32_t fault_index;
+
+    /* Interrupt remapping table base gfn and the max of entries */
+    uint32_t irt_max_entry;
+    uint64_t irt;
+
+    uint32_t regs[VVTD_MAX_OFFSET/sizeof(uint32_t)];
+};
+
+DECLARE_HVM_SAVE_TYPE(VVTD, 21, struct hvm_hw_vvtd);
+
 /* 
  * Largest type-code in use
  */
-#define HVM_SAVE_CODE_MAX 20
+#define HVM_SAVE_CODE_MAX 21
 
 #endif /* __XEN_PUBLIC_HVM_SAVE_X86_H__ */
 

@@ -27,8 +27,10 @@
 #include <asm/event.h>
 #include <asm/io_apic.h>
 #include <asm/hvm/domain.h>
+#include <asm/hvm/save.h>
 #include <asm/hvm/support.h>
 #include <asm/p2m.h>
+#include <public/hvm/save.h>
 
 #include "iommu.h"
 #include "vtd.h"
@@ -38,20 +40,6 @@
 
 #define VVTD_FRCD_NUM   1ULL
 #define VVTD_FRCD_START (DMAR_IRTA_REG + 8)
-#define VVTD_FRCD_END   (VVTD_FRCD_START + VVTD_FRCD_NUM * 16)
-#define VVTD_MAX_OFFSET VVTD_FRCD_END
-
-struct hvm_hw_vvtd {
-    bool eim_enabled;
-    bool intremap_enabled;
-    uint32_t fault_index;
-
-    /* Interrupt remapping table base gfn and the max of entries */
-    uint16_t irt_max_entry;
-    gfn_t irt;
-
-    uint32_t regs[VVTD_MAX_OFFSET/sizeof(uint32_t)];
-};
 
 struct vvtd {
     /* Base address of remapping hardware register-set */
@@ -776,7 +764,7 @@ static void write_gcmd_sirtp(struct vvtd *vvtd, uint32_t val)
     if ( vvtd->hw.intremap_enabled )
         vvtd_info("Update Interrupt Remapping Table when active\n");
 
-    if ( gfn_x(vvtd->hw.irt) != PFN_DOWN(DMA_IRTA_ADDR(irta)) ||
+    if ( vvtd->hw.irt != PFN_DOWN(DMA_IRTA_ADDR(irta)) ||
          vvtd->hw.irt_max_entry != DMA_IRTA_SIZE(irta) )
     {
         if ( vvtd->irt_base )
@@ -786,14 +774,14 @@ static void write_gcmd_sirtp(struct vvtd *vvtd, uint32_t val)
                                      sizeof(struct iremap_entry)));
             vvtd->irt_base = NULL;
         }
-        vvtd->hw.irt = _gfn(PFN_DOWN(DMA_IRTA_ADDR(irta)));
+        vvtd->hw.irt = PFN_DOWN(DMA_IRTA_ADDR(irta));
         vvtd->hw.irt_max_entry = DMA_IRTA_SIZE(irta);
         vvtd->hw.eim_enabled = !!(irta & IRTA_EIME);
         vvtd_info("Update IR info (addr=%lx eim=%d size=%d)\n",
-                  gfn_x(vvtd->hw.irt), vvtd->hw.eim_enabled,
+                  vvtd->hw.irt, vvtd->hw.eim_enabled,
                   vvtd->hw.irt_max_entry);
 
-        vvtd->irt_base = map_guest_pages(vvtd->domain, gfn_x(vvtd->hw.irt),
+        vvtd->irt_base = map_guest_pages(vvtd->domain, vvtd->hw.irt,
                                          PFN_UP(vvtd->hw.irt_max_entry *
                                                 sizeof(struct iremap_entry)));
     }
@@ -1137,6 +1125,39 @@ static bool vvtd_is_remapping(const struct domain *d,
 
     return !irq_remapping_request_index(irq, &idx);
 }
+
+static int vvtd_load(struct domain *d, hvm_domain_context_t *h)
+{
+    struct vvtd *vvtd = domain_vvtd(d);
+    uint64_t iqa;
+
+    if ( !vvtd )
+        return -ENODEV;
+
+    if ( hvm_load_entry(VVTD, h, &vvtd->hw) )
+        return -EINVAL;
+
+    iqa = vvtd_get_reg_quad(vvtd, DMAR_IQA_REG);
+    vvtd->irt_base = map_guest_pages(vvtd->domain, vvtd->hw.irt,
+                                     PFN_UP(vvtd->hw.irt_max_entry *
+                                            sizeof(struct iremap_entry)));
+    vvtd->inv_queue_base = map_guest_pages(vvtd->domain,
+                                           PFN_DOWN(DMA_IQA_ADDR(iqa)),
+                                           1 << DMA_IQA_QS(iqa));
+    return 0;
+}
+
+static int vvtd_save(struct domain *d, hvm_domain_context_t *h)
+{
+    struct vvtd *vvtd = domain_vvtd(d);
+
+    if ( !vvtd )
+        return 0;
+
+    return hvm_save_entry(VVTD, 0, h, &vvtd->hw);
+}
+
+HVM_REGISTER_SAVE_RESTORE(VVTD, vvtd_save, vvtd_load, 1, HVMSR_PER_DOM);
 
 static void vvtd_reset(struct vvtd *vvtd)
 {
