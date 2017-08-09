@@ -216,6 +216,15 @@
 #define dma_frcd_source_id(c) (c & 0xffff)
 #define dma_frcd_page_addr(d) (d & (((u64)-1) << 12)) /* low 64 bit */
 
+/* Interrupt remapping transition faults */
+#define VTD_FR_IR_REQ_RSVD      0x20
+#define VTD_FR_IR_INDEX_OVER    0x21
+#define VTD_FR_IR_ENTRY_P       0x22
+#define VTD_FR_IR_ROOT_INVAL    0x23
+#define VTD_FR_IR_IRTE_RSVD     0x24
+#define VTD_FR_IR_REQ_COMPAT    0x25
+#define VTD_FR_IR_SID_ERR       0x26
+
 /*
  * 0: Present
  * 1-11: Reserved
@@ -354,6 +363,12 @@ struct iremap_entry {
     } post;
   };
 };
+
+/*
+ * When VT-d doesn't enable extended interrupt mode, hardware interprets
+ * 8-bits ([15:8]) of Destination-ID field in the IRTEs.
+ */
+#define IRTE_xAPIC_DEST_MASK 0xff00
 
 /*
  * Posted-interrupt descriptor address is 64 bits with 64-byte aligned, only
