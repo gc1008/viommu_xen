@@ -196,25 +196,66 @@
 #define DMA_CCMD_CAIG_MASK(x) (((u64)x) & ((u64) 0x3 << 59))
 
 /* FECTL_REG */
-#define DMA_FECTL_IM        ((uint32_t)1 << 31)
+#define DMA_FECTL_IM_SHIFT  31
+#define DMA_FECTL_IP_SHIFT  30
+#define DMA_FECTL_IM        ((uint32_t)1 << DMA_FECTL_IM_SHIFT)
+#define DMA_FECTL_IP        ((uint32_t)1 << DMA_FECTL_IP_SHIFT)
 
 /* FSTS_REG */
-#define DMA_FSTS_PFO        ((uint32_t)1 << 0)
-#define DMA_FSTS_PPF        ((uint32_t)1 << 1)
+#define DMA_FSTS_PFO_SHIFT  0
+#define DMA_FSTS_PPF_SHIFT  1
+#define DMA_FSTS_PRO_SHIFT  7
+
+#define DMA_FSTS_PFO        ((uint32_t)1 << DMA_FSTS_PFO_SHIFT)
+#define DMA_FSTS_PPF        ((uint32_t)1 << DMA_FSTS_PPF_SHIFT)
 #define DMA_FSTS_AFO        ((uint32_t)1 << 2)
 #define DMA_FSTS_APF        ((uint32_t)1 << 3)
 #define DMA_FSTS_IQE        ((uint32_t)1 << 4)
 #define DMA_FSTS_ICE        ((uint32_t)1 << 5)
 #define DMA_FSTS_ITE        ((uint32_t)1 << 6)
-#define DMA_FSTS_FAULTS    DMA_FSTS_PFO | DMA_FSTS_PPF | DMA_FSTS_AFO | DMA_FSTS_APF | DMA_FSTS_IQE | DMA_FSTS_ICE | DMA_FSTS_ITE
+#define DMA_FSTS_PRO        ((uint32_t)1 << DMA_FSTS_PRO_SHIFT)
+#define DMA_FSTS_FAULTS     (DMA_FSTS_PFO | DMA_FSTS_PPF | DMA_FSTS_AFO | \
+                             DMA_FSTS_APF | DMA_FSTS_IQE | DMA_FSTS_ICE | \
+                             DMA_FSTS_ITE | DMA_FSTS_PRO)
+#define DMA_FSTS_RW1CS      (DMA_FSTS_PFO | DMA_FSTS_AFO | DMA_FSTS_APF | \
+                             DMA_FSTS_IQE | DMA_FSTS_ICE | DMA_FSTS_ITE | \
+                             DMA_FSTS_PRO)
 #define dma_fsts_fault_record_index(s) (((s) >> 8) & 0xff)
 
 /* FRCD_REG, 32 bits access */
-#define DMA_FRCD_F (((u64)1) << 31)
+#define DMA_FRCD_LEN            0x10
+#define DMA_FRCD2_OFFSET        0x8
+#define DMA_FRCD3_OFFSET        0xc
+#define DMA_FRCD_F_SHIFT        31
+#define DMA_FRCD_F ((u64)1 << DMA_FRCD_F_SHIFT)
 #define dma_frcd_type(d) ((d >> 30) & 1)
 #define dma_frcd_fault_reason(c) (c & 0xff)
 #define dma_frcd_source_id(c) (c & 0xffff)
 #define dma_frcd_page_addr(d) (d & (((u64)-1) << 12)) /* low 64 bit */
+
+struct vtd_fault_record_register
+{
+    union {
+        struct {
+            uint64_t lo;
+            uint64_t hi;
+        } bits;
+        struct {
+            uint64_t rsvd0          :12,
+                     fault_info     :52;
+            uint64_t source_id      :16,
+                     rsvd1          :9,
+                     pmr            :1,  /* Privilege Mode Requested */
+                     exe            :1,  /* Execute Permission Requested */
+                     pasid_p        :1,  /* PASID Present */
+                     fault_reason   :8,  /* Fault Reason */
+                     pasid_val      :20, /* PASID Value */
+                     addr_type      :2,  /* Address Type */
+                     type           :1,  /* Type. (0) Write (1) Read/AtomicOp */
+                     fault          :1;  /* Fault */
+        } fields;
+    };
+};
 
 /* Interrupt remapping transition faults */
 #define VTD_FR_IR_REQ_RSVD      0x20
