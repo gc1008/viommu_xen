@@ -26,28 +26,28 @@
  * Intel IOMMU register specification per version 1.0 public spec.
  */
 
-#define    DMAR_VER_REG    0x0    /* Arch version supported by this IOMMU */
-#define    DMAR_CAP_REG    0x8    /* Hardware supported capabilities */
-#define    DMAR_ECAP_REG    0x10    /* Extended capabilities supported */
-#define    DMAR_GCMD_REG    0x18    /* Global command register */
-#define    DMAR_GSTS_REG    0x1c    /* Global status register */
-#define    DMAR_RTADDR_REG    0x20    /* Root entry table */
-#define    DMAR_CCMD_REG    0x28    /* Context command reg */
-#define    DMAR_FSTS_REG    0x34    /* Fault Status register */
-#define    DMAR_FECTL_REG    0x38    /* Fault control register */
-#define    DMAR_FEDATA_REG    0x3c    /* Fault event interrupt data register */
-#define    DMAR_FEADDR_REG    0x40    /* Fault event interrupt addr register */
-#define    DMAR_FEUADDR_REG 0x44    /* Upper address register */
-#define    DMAR_AFLOG_REG    0x58    /* Advanced Fault control */
-#define    DMAR_PMEN_REG    0x64    /* Enable Protected Memory Region */
-#define    DMAR_PLMBASE_REG 0x68    /* PMRR Low addr */
-#define    DMAR_PLMLIMIT_REG 0x6c    /* PMRR low limit */
-#define    DMAR_PHMBASE_REG 0x70    /* pmrr high base addr */
-#define    DMAR_PHMLIMIT_REG 0x78    /* pmrr high limit */
-#define    DMAR_IQH_REG    0x80    /* invalidation queue head */
-#define    DMAR_IQT_REG    0x88    /* invalidation queue tail */
-#define    DMAR_IQA_REG    0x90    /* invalidation queue addr */
-#define    DMAR_IRTA_REG   0xB8    /* intr remap */
+#define DMAR_VER_REG            0x0  /* Arch version supported by this IOMMU */
+#define DMAR_CAP_REG            0x8  /* Hardware supported capabilities */
+#define DMAR_ECAP_REG           0x10 /* Extended capabilities supported */
+#define DMAR_GCMD_REG           0x18 /* Global command register */
+#define DMAR_GSTS_REG           0x1c /* Global status register */
+#define DMAR_RTADDR_REG         0x20 /* Root entry table */
+#define DMAR_CCMD_REG           0x28 /* Context command reg */
+#define DMAR_FSTS_REG           0x34 /* Fault Status register */
+#define DMAR_FECTL_REG          0x38 /* Fault control register */
+#define DMAR_FEDATA_REG         0x3c /* Fault event interrupt data register */
+#define DMAR_FEADDR_REG         0x40 /* Fault event interrupt addr register */
+#define DMAR_FEUADDR_REG        0x44 /* Upper address register */
+#define DMAR_AFLOG_REG          0x58 /* Advanced Fault control */
+#define DMAR_PMEN_REG           0x64 /* Enable Protected Memory Region */
+#define DMAR_PLMBASE_REG        0x68 /* PMRR Low addr */
+#define DMAR_PLMLIMIT_REG       0x6c /* PMRR low limit */
+#define DMAR_PHMBASE_REG        0x70 /* pmrr high base addr */
+#define DMAR_PHMLIMIT_REG       0x78 /* pmrr high limit */
+#define DMAR_IQH_REG            0x80 /* invalidation queue head */
+#define DMAR_IQT_REG            0x88 /* invalidation queue tail */
+#define DMAR_IQA_REG            0x90 /* invalidation queue addr */
+#define DMAR_IRTA_REG           0xb8 /* intr remap */
 
 #define OFFSET_STRIDE        (9)
 #define dmar_readl(dmar, reg) readl((dmar) + (reg))
@@ -93,16 +93,26 @@
  * Extended Capability Register
  */
 
+#define DMA_ECAP_SNP_CTL        ((uint64_t)1 << 7)
+#define DMA_ECAP_PASS_THRU      ((uint64_t)1 << 6)
+#define DMA_ECAP_CACHE_HINTS    ((uint64_t)1 << 5)
+#define DMA_ECAP_EIM            ((uint64_t)1 << 4)
+#define DMA_ECAP_INTR_REMAP     ((uint64_t)1 << 3)
+#define DMA_ECAP_DEV_IOTLB      ((uint64_t)1 << 2)
+#define DMA_ECAP_QUEUED_INVAL   ((uint64_t)1 << 1)
+#define DMA_ECAP_COHERENT       ((uint64_t)1 << 0)
+
+#define ecap_snp_ctl(e)         MASK_EXTR(e, DMA_ECAP_SNP_CTL)
+#define ecap_pass_thru(e)       MASK_EXTR(e, DMA_ECAP_PASS_THRU)
+#define ecap_cache_hints(e)     MASK_EXTR(e, DMA_ECAP_CACHE_HINTS)
+#define ecap_eim(e)             MASK_EXTR(e, DMA_ECAP_EIM)
+#define ecap_intr_remap(e)      MASK_EXTR(e, DMA_ECAP_INTR_REMAP)
+#define ecap_dev_iotlb(e)       MASK_EXTR(e, DMA_ECAP_DEV_IOTLB)
+#define ecap_queued_inval(e)    MASK_EXTR(e, DMA_ECAP_QUEUED_INVAL)
+#define ecap_coherent(e)        MASK_EXTR(e, DMA_ECAP_COHERENT)
+
 #define ecap_niotlb_iunits(e)    ((((e) >> 24) & 0xff) + 1)
 #define ecap_iotlb_offset(e)     ((((e) >> 8) & 0x3ff) * 16)
-#define ecap_coherent(e)         ((e >> 0) & 0x1)
-#define ecap_queued_inval(e)     ((e >> 1) & 0x1)
-#define ecap_dev_iotlb(e)        ((e >> 2) & 0x1)
-#define ecap_intr_remap(e)       ((e >> 3) & 0x1)
-#define ecap_eim(e)              ((e >> 4) & 0x1)
-#define ecap_cache_hints(e)      ((e >> 5) & 0x1)
-#define ecap_pass_thru(e)        ((e >> 6) & 0x1)
-#define ecap_snp_ctl(e)          ((e >> 7) & 0x1)
 
 /* IOTLB_REG */
 #define DMA_TLB_FLUSH_GRANU_OFFSET  60
@@ -164,16 +174,16 @@
 #define DMA_CCMD_CAIG_MASK(x) (((u64)x) & ((u64) 0x3 << 59))
 
 /* FECTL_REG */
-#define DMA_FECTL_IM (((u64)1) << 31)
+#define DMA_FECTL_IM        ((uint32_t)1 << 31)
 
 /* FSTS_REG */
-#define DMA_FSTS_PFO ((u64)1 << 0)
-#define DMA_FSTS_PPF ((u64)1 << 1)
-#define DMA_FSTS_AFO ((u64)1 << 2)
-#define DMA_FSTS_APF ((u64)1 << 3)
-#define DMA_FSTS_IQE ((u64)1 << 4)
-#define DMA_FSTS_ICE ((u64)1 << 5)
-#define DMA_FSTS_ITE ((u64)1 << 6)
+#define DMA_FSTS_PFO        ((uint32_t)1 << 0)
+#define DMA_FSTS_PPF        ((uint32_t)1 << 1)
+#define DMA_FSTS_AFO        ((uint32_t)1 << 2)
+#define DMA_FSTS_APF        ((uint32_t)1 << 3)
+#define DMA_FSTS_IQE        ((uint32_t)1 << 4)
+#define DMA_FSTS_ICE        ((uint32_t)1 << 5)
+#define DMA_FSTS_ITE        ((uint32_t)1 << 6)
 #define DMA_FSTS_FAULTS    DMA_FSTS_PFO | DMA_FSTS_PPF | DMA_FSTS_AFO | DMA_FSTS_APF | DMA_FSTS_IQE | DMA_FSTS_ICE | DMA_FSTS_ITE
 #define dma_fsts_fault_record_index(s) (((s) >> 8) & 0xff)
 
