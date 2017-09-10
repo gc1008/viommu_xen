@@ -565,6 +565,15 @@ static int vvtd_get_irq_info(const struct domain *d,
     return 0;
 }
 
+/* check whether the interrupt request is remappable */
+static bool vvtd_is_remapping(const struct domain *d,
+                              const struct arch_irq_remapping_request *irq)
+{
+    uint32_t idx;
+
+    return !irq_remapping_request_index(irq, &idx);
+}
+
 static void vvtd_reset(struct vvtd *vvtd)
 {
     uint64_t cap = cap_set_num_fault_regs(VVTD_FRCD_NUM)
@@ -628,6 +637,7 @@ static const struct viommu_ops vvtd_hvm_vmx_ops = {
     .destroy = vvtd_destroy,
     .handle_irq_request = vvtd_handle_irq_request,
     .get_irq_info = vvtd_get_irq_info,
+    .check_irq_remapping = vvtd_is_remapping,
 };
 
 REGISTER_VIOMMU(vvtd_hvm_vmx_ops);
