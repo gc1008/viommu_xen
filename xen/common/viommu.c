@@ -114,6 +114,21 @@ int viommu_domctl(struct domain *d, struct xen_domctl_viommu_op *op)
     return rc;
 }
 
+int viommu_handle_irq_request(const struct domain *d,
+                              const struct arch_irq_remapping_request *request)
+{
+    struct viommu *viommu = d->arch.hvm_domain.viommu;
+
+    if ( !viommu )
+        return -ENODEV;
+
+    ASSERT(viommu->ops);
+    if ( !viommu->ops->handle_irq_request )
+        return -EINVAL;
+
+    return viommu->ops->handle_irq_request(d, request);
+}
+
 /*
  * Local variables:
  * mode: C

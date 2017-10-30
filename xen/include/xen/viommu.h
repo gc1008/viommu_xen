@@ -22,12 +22,16 @@
 
 #ifdef CONFIG_VIOMMU
 
+#include <asm/viommu.h>
+
 struct viommu;
 
 struct viommu_ops {
     uint8_t type;
     int (*create)(struct domain *d, struct viommu *viommu);
     int (*destroy)(struct viommu *viommu);
+    int (*handle_irq_request)(const struct domain *d,
+                              const struct arch_irq_remapping_request *request);
 };
 
 struct viommu {
@@ -44,6 +48,8 @@ struct viommu {
 int viommu_register_type(uint8_t type, struct viommu_ops *ops);
 int viommu_destroy_domain(struct domain *d);
 int viommu_domctl(struct domain *d, struct xen_domctl_viommu_op *op);
+int viommu_handle_irq_request(const struct domain *d,
+                              const struct arch_irq_remapping_request *request);
 #else
 static inline int viommu_destroy_domain(struct domain *d)
 {
