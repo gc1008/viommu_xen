@@ -145,6 +145,21 @@ int viommu_get_irq_info(const struct domain *d,
     return viommu->ops->get_irq_info(d, request, irq_info);
 }
 
+bool viommu_check_irq_remapping(const struct domain *d,
+                                const struct arch_irq_remapping_request *request)
+{
+    const struct viommu *viommu = d->arch.hvm_domain.viommu;
+
+    if ( !viommu )
+        return false;
+
+    ASSERT(viommu->ops);
+    if ( !viommu->ops->check_irq_remapping )
+        return false;
+
+    return viommu->ops->check_irq_remapping(d, request);
+}
+
 /*
  * Local variables:
  * mode: C
