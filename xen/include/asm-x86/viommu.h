@@ -26,6 +26,14 @@ enum viommu_irq_request_type {
     VIOMMU_REQUEST_IRQ_APIC = 1
 };
 
+struct arch_irq_remapping_info
+{
+    uint8_t dest_mode:1;
+    uint8_t delivery_mode:3;
+    uint8_t  vector;
+    uint32_t dest;
+};
+
 struct arch_irq_remapping_request
 {
     union {
