@@ -1756,16 +1756,17 @@ int xc_domain_ioport_mapping(xc_interface *xch,
 int xc_domain_update_msi_irq(
     xc_interface *xch,
     uint32_t domid,
-    uint32_t gvec,
     uint32_t pirq,
+    uint64_t addr,
+    uint32_t data,
     uint32_t gflags,
     uint64_t gtable);
 
 int xc_domain_unbind_msi_irq(xc_interface *xch,
                              uint32_t domid,
-                             uint32_t gvec,
                              uint32_t pirq,
-                             uint32_t gflags);
+                             uint64_t addr,
+                             uint32_t data);
 
 int xc_domain_bind_pt_irq(xc_interface *xch,
                           uint32_t domid,

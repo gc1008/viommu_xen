@@ -101,12 +101,12 @@ int vmsi_deliver(
 
 void vmsi_deliver_pirq(struct domain *d, const struct hvm_pirq_dpci *pirq_dpci)
 {
-    uint32_t flags = pirq_dpci->gmsi.gflags;
-    int vector = pirq_dpci->gmsi.gvec;
-    uint8_t dest = (uint8_t)flags;
-    bool dest_mode = flags & XEN_DOMCTL_VMSI_X86_DM_MASK;
-    uint8_t delivery_mode = MASK_EXTR(flags, XEN_DOMCTL_VMSI_X86_DELIV_MASK);
-    bool trig_mode = flags & XEN_DOMCTL_VMSI_X86_TRIG_MASK;
+    uint8_t vector = pirq_dpci->gmsi.data & MSI_DATA_VECTOR_MASK;
+    uint8_t dest = MASK_EXTR(pirq_dpci->gmsi.addr, MSI_ADDR_DEST_ID_MASK);
+    bool dest_mode = pirq_dpci->gmsi.addr & MSI_ADDR_DESTMODE_MASK;
+    uint8_t delivery_mode = MASK_EXTR(pirq_dpci->gmsi.data,
+                                      MSI_DATA_DELIVERY_MODE_MASK);
+    bool trig_mode = pirq_dpci->gmsi.data & MSI_DATA_TRIGGER_MASK;
 
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
                 "msi: dest=%x dest_mode=%x delivery_mode=%x "

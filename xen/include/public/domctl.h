@@ -536,15 +536,11 @@ struct xen_domctl_bind_pt_irq {
             uint8_t intx;
         } pci;
         struct {
-            uint8_t gvec;
             uint32_t gflags;
-#define XEN_DOMCTL_VMSI_X86_DEST_ID_MASK 0x0000ff
-#define XEN_DOMCTL_VMSI_X86_RH_MASK      0x000100
-#define XEN_DOMCTL_VMSI_X86_DM_MASK      0x000200
-#define XEN_DOMCTL_VMSI_X86_DELIV_MASK   0x007000
-#define XEN_DOMCTL_VMSI_X86_TRIG_MASK    0x008000
 #define XEN_DOMCTL_VMSI_X86_UNMASKED     0x010000
 
+            uint32_t data;
+            uint64_t addr;
             uint64_aligned_t gtable;
         } msi;
         struct {

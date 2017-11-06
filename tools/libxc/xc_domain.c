@@ -1735,8 +1735,9 @@ int xc_deassign_dt_device(
 int xc_domain_update_msi_irq(
     xc_interface *xch,
     uint32_t domid,
-    uint32_t gvec,
     uint32_t pirq,
+    uint64_t addr,
+    uint32_t data,
     uint32_t gflags,
     uint64_t gtable)
 {
@@ -1750,7 +1751,8 @@ int xc_domain_update_msi_irq(
     bind = &(domctl.u.bind_pt_irq);
     bind->irq_type = PT_IRQ_TYPE_MSI;
     bind->machine_irq = pirq;
-    bind->u.msi.gvec = gvec;
+    bind->u.msi.addr = addr;
+    bind->u.msi.data = data;
     bind->u.msi.gflags = gflags;
     bind->u.msi.gtable = gtable;
 
@@ -1761,9 +1763,9 @@ int xc_domain_update_msi_irq(
 int xc_domain_unbind_msi_irq(
     xc_interface *xch,
     uint32_t domid,
-    uint32_t gvec,
     uint32_t pirq,
-    uint32_t gflags)
+    uint64_t addr,
+    uint32_t data)
 {
     int rc;
     struct xen_domctl_bind_pt_irq *bind;
@@ -1775,8 +1777,8 @@ int xc_domain_unbind_msi_irq(
     bind = &(domctl.u.bind_pt_irq);
     bind->irq_type = PT_IRQ_TYPE_MSI;
     bind->machine_irq = pirq;
-    bind->u.msi.gvec = gvec;
-    bind->u.msi.gflags = gflags;
+    bind->u.msi.addr = addr;
+    bind->u.msi.data = data;
 
     rc = do_domctl(xch, &domctl);
     return rc;

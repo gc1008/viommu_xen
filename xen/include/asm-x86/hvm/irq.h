@@ -132,9 +132,10 @@ struct dev_intx_gsi_link {
 #define HVM_IRQ_DPCI_TRANSLATE       (1u << _HVM_IRQ_DPCI_TRANSLATE_SHIFT)
 
 struct hvm_gmsi_info {
-    uint32_t gvec;
-    uint32_t gflags;
+    uint32_t data;
     int dest_vcpu_id; /* -1 :multi-dest, non-negative: dest_vcpu_id */
+    uint64_t addr;
+    uint8_t gvec;
     bool posted; /* directly deliver to guest via VT-d PI? */
 };
 
