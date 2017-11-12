@@ -58,6 +58,17 @@ static inline void irq_request_ioapic_fill(
     req->msg.rte = rte;
 }
 
+static inline void irq_request_msi_fill(
+    struct arch_irq_remapping_request *req, uint64_t addr, uint32_t data)
+{
+    ASSERT(req);
+    req->type = VIOMMU_REQUEST_IRQ_MSI;
+    /* Source ID isn't in use */
+    req->source_id = 0;
+    req->msg.msi.addr = addr;
+    req->msg.msi.data = data;
+}
+
 #endif /* __ARCH_X86_VIOMMU_H__ */
 
 /*

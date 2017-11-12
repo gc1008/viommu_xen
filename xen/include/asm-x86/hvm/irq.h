@@ -176,6 +176,7 @@ struct hvm_pirq_dpci {
 
 void pt_pirq_init(struct domain *, struct hvm_pirq_dpci *);
 bool pt_pirq_cleanup_check(struct hvm_pirq_dpci *);
+void pt_update_gmsi(struct domain *d, struct hvm_pirq_dpci *pirq_dpci);
 int pt_pirq_iterate(struct domain *d,
                     int (*cb)(struct domain *,
                               struct hvm_pirq_dpci *, void *arg),

@@ -462,7 +462,7 @@ void hvm_migrate_timers(struct vcpu *v)
     pt_migrate(v);
 }
 
-static int hvm_migrate_pirq(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
+int hvm_migrate_pirq(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
                             void *arg)
 {
     struct vcpu *v = arg;

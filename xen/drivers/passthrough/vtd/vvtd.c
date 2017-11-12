@@ -477,6 +477,50 @@ static int vvtd_record_fault(struct vvtd *vvtd,
 }
 
 /*
+ * 'arg' is the index of interrupt remapping table. This index is used to
+ * search physical irqs which satify that the gmsi mapped with the physical irq
+ * is tranlated by the IRTE refered to by the index. The struct hvm_gmsi_info
+ * contains some fields are infered from an virtual IRTE. These fields should
+ * be updated when guest invalidates an IRTE. Furthermore, the physical IRTE
+ * is updated accordingly to reduce IPIs or utilize VT-d posted interrupt.
+ *
+ * if 'arg' is -1, perform a global invalidation.
+ */
+static int invalidate_gmsi(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
+                         void *arg)
+{
+    if ( pirq_dpci->flags & HVM_IRQ_DPCI_GUEST_MSI )
+    {
+        uint32_t index, target = (long)arg;
+        struct arch_irq_remapping_request req;
+        const struct vcpu *vcpu;
+
+        irq_request_msi_fill(&req, pirq_dpci->gmsi.addr, pirq_dpci->gmsi.data);
+        if ( !irq_remapping_request_index(&req, &index) &&
+             ((target == -1) || (target == index)) )
+        {
+            pt_update_gmsi(d, pirq_dpci);
+            if ( pirq_dpci->gmsi.dest_vcpu_id >= 0 )
+                hvm_migrate_pirq(d, pirq_dpci,
+                                 d->vcpu[pirq_dpci->gmsi.dest_vcpu_id]);
+
+            /* Use interrupt posting if it is supported. */
+            if ( iommu_intpost )
+            {
+                if ( pirq_dpci->gmsi.posted )
+                    vcpu = d->vcpu[pirq_dpci->gmsi.dest_vcpu_id];
+                else
+                    vcpu = NULL;
+                pi_update_irte(vcpu ? &vcpu->arch.hvm_vmx.pi_desc : NULL,
+                               dpci_pirq(pirq_dpci), pirq_dpci->gmsi.gvec);
+            }
+        }
+    }
+
+    return 0;
+}
+
+/*
  * Process an invalidation descriptor. Currently, only two types descriptors,
  * Interrupt Entry Cache Invalidation Descritor and Invalidation Wait
  * Descriptor are handled.
@@ -530,7 +574,26 @@ static int process_iqe(struct vvtd *vvtd, uint32_t i)
         break;
 
     case TYPE_INVAL_IEC:
-        /* No cache is preserved in vvtd, nothing is needed to be flushed */
+        /*
+         * If VT-d pi is enabled, pi_update_irte() may be called. It assumes
+         * pcidevs_locked().
+         */
+        pcidevs_lock();
+        spin_lock(&vvtd->domain->event_lock);
+        /* A global invalidation of the cache is requested */
+        if ( !qinval.q.iec_inv_dsc.lo.granu )
+            pt_pirq_iterate(vvtd->domain, invalidate_gmsi, (void *)(long)-1);
+        else
+        {
+            uint32_t iidx = qinval.q.iec_inv_dsc.lo.iidx;
+            uint32_t nr = 1 << qinval.q.iec_inv_dsc.lo.im;
+
+            for ( ; nr; nr--, iidx++)
+                pt_pirq_iterate(vvtd->domain, invalidate_gmsi,
+                                (void *)(long)iidx);
+        }
+        spin_unlock(&vvtd->domain->event_lock);
+        pcidevs_unlock();
         break;
 
     default:
@@ -839,6 +902,8 @@ static int vvtd_read(struct vcpu *v, unsigned long addr,
     else
         *pval = vvtd_get_reg_quad(vvtd, offset);
 
+    if ( !atomic_read(&vvtd->inflight_intr) )
+        vvtd_process_iq(vvtd);
     return X86EMUL_OKAY;
 }
 
@@ -1088,8 +1153,7 @@ static int vvtd_handle_irq_request(const struct domain *d,
                         irte.remap.tm);
 
  out:
-    if ( !atomic_dec_and_test(&vvtd->inflight_intr) )
-        vvtd_process_iq(vvtd);
+    atomic_dec(&vvtd->inflight_intr);
     return ret;
 }
 
